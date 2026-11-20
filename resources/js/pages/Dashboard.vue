@@ -1,19 +1,21 @@
 <script setup lang="ts">
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
-    Activity,
+    Activity as ActivityIcon,
+    ArrowRight,
     ArrowUpRight,
     CheckCircle2,
     Clock,
-    Key,
+    FileSpreadsheet,
+    History,
+    KeyRound,
     Layers,
     Menu as MenuIcon,
     Plus,
+    Server,
     Shield,
-    ShieldAlert,
     ShieldCheck,
-    Sparkles,
-    UserCheck,
+    UserPlus,
     Users,
 } from '@lucide/vue';
 import { computed } from 'vue';
@@ -48,6 +50,17 @@ interface RoleSummary {
     permissions_count: number;
 }
 
+interface ActivityItem {
+    id: number;
+    description: string;
+    created_at: string;
+    causer?: {
+        id: number;
+        name: string;
+        email: string;
+    } | null;
+}
+
 const props = defineProps<{
     stats: {
         total_users: number;
@@ -57,6 +70,7 @@ const props = defineProps<{
     };
     recentUsers: UserItem[];
     rolesSummary: RoleSummary[];
+    recentActivities?: ActivityItem[];
 }>();
 
 const page = usePage<{ auth: Auth }>();
@@ -70,6 +84,23 @@ const greeting = computed(() => {
     return 'Selamat Malam';
 });
 
+const todayFormatted = computed(() => {
+    return new Intl.DateTimeFormat('id-ID', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    }).format(new Date());
+});
+
+const formatTimeAgo = (dateStr: string) => {
+    const diff = Math.floor((new Date().getTime() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return 'Baru saja';
+    if (diff < 3600) return `${Math.floor(diff / 60)} mnt lalu`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`;
+    return `${Math.floor(diff / 86400)} hari lalu`;
+};
+
 const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('id-ID', {
         day: 'numeric',
@@ -77,165 +108,191 @@ const formatDate = (dateStr: string) => {
         year: 'numeric',
     });
 };
+
+const getInitials = (name: string) => {
+    return name
+        .split(' ')
+        .map((n) => n[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
+};
 </script>
 
 <template>
     <Head title="Dashboard" />
 
     <div class="flex h-full flex-1 flex-col gap-6 p-6">
-        <!-- Welcome Hero Banner -->
-        <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-800 via-emerald-700 to-teal-800 p-7 text-white shadow-lg">
-            <!-- Decorative blur & glow -->
-            <div class="absolute -right-10 -top-10 h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl"></div>
-            <div class="absolute -bottom-10 right-1/3 h-48 w-48 rounded-full bg-teal-400/20 blur-2xl"></div>
-
-            <div class="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div class="space-y-1.5">
-                    <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/30 px-3 py-1 text-xs font-medium text-emerald-100 backdrop-blur-sm">
-                            <Sparkles class="h-3.5 w-3.5 text-emerald-300" />
-                            Sistem Manajemen Akses Aktif
-                        </span>
-                    </div>
-                    <h1 class="text-2xl font-bold tracking-tight sm:text-3xl">
-                        {{ greeting }}, {{ currentUser?.name }}!
-                    </h1>
-                    <p class="text-sm text-emerald-100/90 max-w-xl">
-                        Selamat datang kembali di panel administrasi. Sistem RBAC & Manajemen Menu dinamis siap dikelola.
-                    </p>
+        <!-- Top Header & Context Bar -->
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-5">
+            <div>
+                <div class="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <span>{{ todayFormatted }}</span>
+                    <span>•</span>
+                    <span class="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
+                        <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Portal Aktif & Terlindungi
+                    </span>
                 </div>
+                <h1 class="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {{ greeting }}, {{ currentUser?.name }}
+                </h1>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                    Ringkasan performa hak akses, pengguna aktif, dan riwayat audit sistem terbaru.
+                </p>
+            </div>
 
-                <div class="flex flex-wrap items-center gap-2.5">
-                    <Button as-child variant="secondary" size="sm" class="bg-white/10 hover:bg-white/20 text-white border-0 backdrop-blur-sm">
-                        <Link href="/menus">
-                            <MenuIcon class="mr-1.5 h-4 w-4" />
-                            Atur Menu
-                        </Link>
-                    </Button>
-                    <Button as-child size="sm" class="bg-white text-emerald-900 hover:bg-emerald-50 font-semibold shadow-sm">
-                        <Link href="/roles">
-                            <ShieldCheck class="mr-1.5 h-4 w-4" />
-                            Kelola Role
-                        </Link>
-                    </Button>
-                </div>
+            <div class="flex items-center gap-2.5">
+                <Button as-child variant="outline" size="sm" class="h-9 text-xs">
+                    <Link href="/activities">
+                        <History class="mr-1.5 size-3.5 text-muted-foreground" />
+                        Log Audit
+                    </Link>
+                </Button>
+                <Button as-child size="sm" class="h-9 text-xs bg-emerald-700 hover:bg-emerald-800 text-white font-medium shadow-xs">
+                    <Link href="/users">
+                        <UserPlus class="mr-1.5 size-3.5" />
+                        Tambah Pengguna
+                    </Link>
+                </Button>
             </div>
         </div>
 
-        <!-- Metric Stat Cards -->
+        <!-- Metric Stat Cards (Modern, Clean Border with Focus Highlights) -->
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <!-- Stat 1: Users -->
-            <div class="group relative overflow-hidden rounded-xl border border-sidebar-border bg-card p-5 shadow-xs transition-all hover:shadow-md hover:border-emerald-500/50">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Total Pengguna</span>
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <Users class="h-5 w-5" />
+            <!-- Total Users -->
+            <div class="group relative rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-emerald-500/50 hover:shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-muted-foreground">Total Pengguna</p>
+                        <h3 class="text-2xl font-bold tracking-tight text-foreground mt-2 font-mono">
+                            {{ stats.total_users }}
+                        </h3>
+                    </div>
+                    <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                        <Users class="size-4" />
                     </div>
                 </div>
-                <div class="mt-3">
-                    <div class="text-3xl font-extrabold tracking-tight">{{ stats.total_users }}</div>
-                    <p class="mt-1 flex items-center text-xs text-muted-foreground">
-                        <UserCheck class="mr-1 h-3.5 w-3.5 text-emerald-600" />
-                        Akun aktif terdaftar
-                    </p>
+                <div class="mt-4 flex items-center justify-between pt-3 border-t border-border/40 text-[11px]">
+                    <span class="text-muted-foreground">Akun terdaftar dalam sistem</span>
+                    <Link href="/users" class="font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-0.5">
+                        Kelola <ArrowRight class="size-3" />
+                    </Link>
                 </div>
             </div>
 
-            <!-- Stat 2: Roles -->
-            <div class="group relative overflow-hidden rounded-xl border border-sidebar-border bg-card p-5 shadow-xs transition-all hover:shadow-md hover:border-emerald-500/50">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Role / Peran</span>
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <Shield class="h-5 w-5" />
+            <!-- Total Roles -->
+            <div class="group relative rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-emerald-500/50 hover:shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-muted-foreground">Peran (Roles)</p>
+                        <h3 class="text-2xl font-bold tracking-tight text-foreground mt-2 font-mono">
+                            {{ stats.total_roles }}
+                        </h3>
+                    </div>
+                    <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                        <Shield class="size-4" />
                     </div>
                 </div>
-                <div class="mt-3">
-                    <div class="text-3xl font-extrabold tracking-tight">{{ stats.total_roles }}</div>
-                    <p class="mt-1 flex items-center text-xs text-muted-foreground">
-                        <CheckCircle2 class="mr-1 h-3.5 w-3.5 text-emerald-600" />
-                        Tingkatan hak akses
-                    </p>
+                <div class="mt-4 flex items-center justify-between pt-3 border-t border-border/40 text-[11px]">
+                    <span class="text-muted-foreground">Tingkatan wewenang hak akses</span>
+                    <Link href="/roles" class="font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-0.5">
+                        Atur <ArrowRight class="size-3" />
+                    </Link>
                 </div>
             </div>
 
-            <!-- Stat 3: Permissions -->
-            <div class="group relative overflow-hidden rounded-xl border border-sidebar-border bg-card p-5 shadow-xs transition-all hover:shadow-md hover:border-emerald-500/50">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Permissions</span>
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <Key class="h-5 w-5" />
+            <!-- Total Permissions -->
+            <div class="group relative rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-emerald-500/50 hover:shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-muted-foreground">Hak Akses (Permissions)</p>
+                        <h3 class="text-2xl font-bold tracking-tight text-foreground mt-2 font-mono">
+                            {{ stats.total_permissions }}
+                        </h3>
+                    </div>
+                    <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                        <KeyRound class="size-4" />
                     </div>
                 </div>
-                <div class="mt-3">
-                    <div class="text-3xl font-extrabold tracking-tight">{{ stats.total_permissions }}</div>
-                    <p class="mt-1 flex items-center text-xs text-muted-foreground">
-                        <Layers class="mr-1 h-3.5 w-3.5 text-emerald-600" />
-                        Otomatis tersinkronisasi
-                    </p>
+                <div class="mt-4 flex items-center justify-between pt-3 border-t border-border/40 text-[11px]">
+                    <span class="text-muted-foreground">Auto-scan controller & rute</span>
+                    <Link href="/permissions" class="font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-0.5">
+                        Rincian <ArrowRight class="size-3" />
+                    </Link>
                 </div>
             </div>
 
-            <!-- Stat 4: Menus -->
-            <div class="group relative overflow-hidden rounded-xl border border-sidebar-border bg-card p-5 shadow-xs transition-all hover:shadow-md hover:border-emerald-500/50">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Menu Sidebar</span>
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
-                        <MenuIcon class="h-5 w-5" />
+            <!-- Dynamic Menus -->
+            <div class="group relative rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-emerald-500/50 hover:shadow-sm">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-muted-foreground">Menu Dinamis</p>
+                        <h3 class="text-2xl font-bold tracking-tight text-foreground mt-2 font-mono">
+                            {{ stats.total_menus }}
+                        </h3>
+                    </div>
+                    <div class="flex size-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400">
+                        <MenuIcon class="size-4" />
                     </div>
                 </div>
-                <div class="mt-3">
-                    <div class="text-3xl font-extrabold tracking-tight">{{ stats.total_menus }}</div>
-                    <p class="mt-1 flex items-center text-xs text-muted-foreground">
-                        <Activity class="mr-1 h-3.5 w-3.5 text-emerald-600" />
-                        Item menu dinamis
-                    </p>
+                <div class="mt-4 flex items-center justify-between pt-3 border-t border-border/40 text-[11px]">
+                    <span class="text-muted-foreground">Navigasi sidebar terhubung RBAC</span>
+                    <Link href="/menus" class="font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 flex items-center gap-0.5">
+                        Susun <ArrowRight class="size-3" />
+                    </Link>
                 </div>
             </div>
         </div>
 
         <!-- Main Content Grid -->
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            <!-- Left Col (2 spans): Ringkasan Role & Hak Akses -->
+            <!-- Left 2 Columns: Roles & Recent Users -->
             <div class="space-y-6 lg:col-span-2">
                 <!-- Roles Distribution Card -->
-                <div class="rounded-xl border border-sidebar-border bg-card p-6 shadow-sm">
+                <div class="rounded-xl border border-border/80 bg-card p-5 shadow-xs">
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <h2 class="text-base font-semibold">Tingkat Hak Akses (Role)</h2>
-                            <p class="text-xs text-muted-foreground">Persebaran izin dan jumlah pengguna per role.</p>
+                            <h2 class="text-sm font-semibold text-foreground">Distribusi Wewenang Peran</h2>
+                            <p class="text-xs text-muted-foreground">Perbandingan izin hak akses dan jumlah pengguna per role.</p>
                         </div>
-                        <Button as-child variant="ghost" size="sm" class="text-xs text-primary hover:text-primary">
+                        <Button as-child variant="ghost" size="sm" class="h-8 text-xs text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 font-medium">
                             <Link href="/roles">
-                                Lihat Semua
-                                <ArrowUpRight class="ml-1 h-3.5 w-3.5" />
+                                Lihat Semua Role
+                                <ArrowUpRight class="ml-1 size-3.5" />
                             </Link>
                         </Button>
                     </div>
 
-                    <div class="space-y-3">
+                    <div class="space-y-2.5">
                         <div
                             v-for="role in rolesSummary"
                             :key="role.id"
-                            class="flex items-center justify-between rounded-lg border border-sidebar-border/70 p-3.5 transition-colors hover:bg-muted/40"
+                            class="flex items-center justify-between rounded-lg border border-border/60 p-3 hover:bg-muted/40 transition-colors"
                         >
                             <div class="flex items-center gap-3">
-                                <div class="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
-                                    <ShieldCheck class="h-5 w-5" />
+                                <div class="flex size-8 items-center justify-center rounded-md bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-semibold text-xs font-mono">
+                                    {{ role.name[0] }}
                                 </div>
                                 <div>
-                                    <div class="font-semibold text-sm">{{ role.name }}</div>
-                                    <div class="text-xs text-muted-foreground">
-                                        {{ role.permissions_count }} Permissions diizinkan
+                                    <div class="font-medium text-xs text-foreground flex items-center gap-1.5">
+                                        {{ role.name }}
+                                        <Badge v-if="role.name === 'Super Admin'" variant="outline" class="text-[10px] py-0 border-emerald-500/40 text-emerald-700 dark:text-emerald-400">
+                                            Bypass All
+                                        </Badge>
+                                    </div>
+                                    <div class="text-[11px] text-muted-foreground mt-0.5">
+                                        {{ role.permissions_count }} izin akses terpasang
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2">
-                                <Badge variant="secondary" class="font-normal text-xs">
-                                    {{ role.users_count }} Pengguna
-                                </Badge>
-                                <Button as-child variant="outline" size="sm" class="h-8 text-xs">
-                                    <Link href="/roles">Atur</Link>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs font-mono text-muted-foreground">
+                                    {{ role.users_count }} user
+                                </span>
+                                <Button as-child variant="ghost" size="sm" class="h-7 px-2 text-xs">
+                                    <Link href="/roles">Kelola</Link>
                                 </Button>
                             </div>
                         </div>
@@ -243,43 +300,58 @@ const formatDate = (dateStr: string) => {
                 </div>
 
                 <!-- Recent Registered Users -->
-                <div class="rounded-xl border border-sidebar-border bg-card p-6 shadow-sm">
+                <div class="rounded-xl border border-border/80 bg-card p-5 shadow-xs">
                     <div class="flex items-center justify-between mb-4">
                         <div>
-                            <h2 class="text-base font-semibold">Pengguna Terbaru</h2>
-                            <p class="text-xs text-muted-foreground">Daftar pengguna yang baru saja bergabung.</p>
+                            <h2 class="text-sm font-semibold text-foreground">Pengguna Baru Terdaftar</h2>
+                            <p class="text-xs text-muted-foreground">Daftar pengguna terbaru yang masuk ke dalam sistem.</p>
                         </div>
+                        <Button as-child variant="ghost" size="sm" class="h-8 text-xs text-emerald-700 hover:text-emerald-800 dark:text-emerald-400 font-medium">
+                            <Link href="/users">
+                                Kelola Pengguna
+                                <ArrowUpRight class="ml-1 size-3.5" />
+                            </Link>
+                        </Button>
                     </div>
 
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left text-sm">
-                            <thead class="border-b border-sidebar-border text-xs uppercase tracking-wider text-muted-foreground">
+                        <table class="w-full text-left text-xs">
+                            <thead class="border-b border-border/60 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold">
                                 <tr>
-                                    <th class="pb-3 font-medium">Nama</th>
-                                    <th class="pb-3 font-medium">Role</th>
-                                    <th class="pb-3 font-medium text-right">Terdaftar</th>
+                                    <th class="pb-2.5 font-medium">Pengguna</th>
+                                    <th class="pb-2.5 font-medium">Peran / Role</th>
+                                    <th class="pb-2.5 font-medium text-right">Bergabung</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-sidebar-border/50">
-                                <tr v-for="user in recentUsers" :key="user.id" class="hover:bg-muted/20">
-                                    <td class="py-3">
-                                        <div class="font-medium text-xs">{{ user.name }}</div>
-                                        <div class="text-[11px] text-muted-foreground">{{ user.email }}</div>
+                            <tbody class="divide-y divide-border/40">
+                                <tr v-for="user in recentUsers" :key="user.id" class="hover:bg-muted/30 transition-colors">
+                                    <td class="py-2.5">
+                                        <div class="flex items-center gap-2.5">
+                                            <div class="flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-semibold text-[11px]">
+                                                {{ getInitials(user.name) }}
+                                            </div>
+                                            <div class="truncate">
+                                                <div class="font-medium text-foreground truncate">{{ user.name }}</div>
+                                                <div class="text-[11px] text-muted-foreground font-mono truncate">{{ user.email }}</div>
+                                            </div>
+                                        </div>
                                     </td>
-                                    <td class="py-3">
+                                    <td class="py-2.5">
                                         <div class="flex flex-wrap gap-1">
                                             <Badge
                                                 v-for="r in user.roles"
                                                 :key="r.id"
-                                                variant="outline"
-                                                class="text-[10px]"
+                                                variant="secondary"
+                                                class="text-[10px] py-0 font-normal"
                                             >
                                                 {{ r.name }}
                                             </Badge>
-                                            <span v-if="!user.roles || user.roles.length === 0" class="text-xs text-muted-foreground">-</span>
+                                            <span v-if="!user.roles || user.roles.length === 0" class="text-xs text-muted-foreground italic">
+                                                Tanpa Role
+                                            </span>
                                         </div>
                                     </td>
-                                    <td class="py-3 text-right text-xs text-muted-foreground font-mono">
+                                    <td class="py-2.5 text-right font-mono text-muted-foreground text-[11px]">
                                         {{ formatDate(user.created_at) }}
                                     </td>
                                 </tr>
@@ -289,66 +361,111 @@ const formatDate = (dateStr: string) => {
                 </div>
             </div>
 
-            <!-- Right Col (1 span): Quick Actions & System Info -->
+            <!-- Right 1 Column: Activity Feed & Security Infrastructure -->
             <div class="space-y-6">
-                <!-- Quick Navigation Box -->
-                <div class="rounded-xl border border-sidebar-border bg-card p-6 shadow-sm">
-                    <h2 class="text-base font-semibold mb-1">Aksi Cepat</h2>
-                    <p class="text-xs text-muted-foreground mb-4">Pintasan praktis untuk mengelola sistem.</p>
-
-                    <div class="flex flex-col gap-2.5">
-                        <Button as-child variant="outline" class="justify-between h-10">
-                            <Link href="/menus">
-                                <div class="flex items-center gap-2">
-                                    <MenuIcon class="h-4 w-4 text-emerald-700" />
-                                    <span>Tambah Menu Sidebar</span>
-                                </div>
-                                <Plus class="h-4 w-4 text-muted-foreground" />
-                            </Link>
+                <!-- Activity Audit Trail Card -->
+                <div class="rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <ActivityIcon class="size-4 text-emerald-700 dark:text-emerald-400" />
+                            <h2 class="text-sm font-semibold text-foreground">Log Aktivitas Terkini</h2>
+                        </div>
+                        <Button as-child variant="ghost" size="sm" class="h-7 px-1.5 text-xs text-muted-foreground hover:text-foreground">
+                            <Link href="/activities">Semua</Link>
                         </Button>
+                    </div>
 
-                        <Button as-child variant="outline" class="justify-between h-10">
-                            <Link href="/roles">
-                                <div class="flex items-center gap-2">
-                                    <Shield class="h-4 w-4 text-emerald-700" />
-                                    <span>Buat Role Baru</span>
+                    <div v-if="recentActivities && recentActivities.length > 0" class="space-y-3">
+                        <div
+                            v-for="activity in recentActivities"
+                            :key="activity.id"
+                            class="flex items-start gap-2.5 text-xs border-l-2 border-emerald-600/40 pl-3 py-1 hover:border-emerald-600 transition-colors"
+                        >
+                            <div class="flex-1 min-w-0">
+                                <p class="text-foreground font-medium text-xs leading-snug">
+                                    {{ activity.description }}
+                                </p>
+                                <div class="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
+                                    <span class="truncate">{{ activity.causer?.name ?? 'Sistem' }}</span>
+                                    <span>•</span>
+                                    <span class="font-mono">{{ formatTimeAgo(activity.created_at) }}</span>
                                 </div>
-                                <Plus class="h-4 w-4 text-muted-foreground" />
-                            </Link>
-                        </Button>
-
-                        <Button as-child variant="outline" class="justify-between h-10">
-                            <Link href="/permissions">
-                                <div class="flex items-center gap-2">
-                                    <Key class="h-4 w-4 text-emerald-700" />
-                                    <span>Lihat Daftar Permission</span>
-                                </div>
-                                <ArrowUpRight class="h-4 w-4 text-muted-foreground" />
-                            </Link>
-                        </Button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-else class="text-center py-6 text-xs text-muted-foreground italic">
+                        Belum ada aktivitas audit log yang tercatat.
                     </div>
                 </div>
 
-                <!-- Security & RBAC Status -->
-                <div class="rounded-xl border border-sidebar-border bg-card p-6 shadow-sm">
+                <!-- System Architecture & Security Status -->
+                <div class="rounded-xl border border-border/80 bg-card p-5 shadow-xs">
                     <div class="flex items-center gap-2 mb-3">
-                        <ShieldCheck class="h-5 w-5 text-emerald-600" />
-                        <h2 class="text-base font-semibold">Status RBAC</h2>
+                        <ShieldCheck class="size-4 text-emerald-700 dark:text-emerald-400" />
+                        <h2 class="text-sm font-semibold text-foreground">Infrastruktur Keamanan</h2>
                     </div>
 
-                    <div class="space-y-3 text-xs">
-                        <div class="flex items-center justify-between rounded-md bg-muted/40 p-2.5">
-                            <span class="text-muted-foreground">Super Admin Bypass</span>
-                            <Badge variant="default" class="bg-emerald-600 text-white">Aktif</Badge>
+                    <div class="space-y-2.5 text-xs">
+                        <div class="flex items-center justify-between rounded-lg bg-muted/40 p-2.5 border border-border/50">
+                            <div class="flex flex-col">
+                                <span class="font-medium text-foreground">RBAC Guard</span>
+                                <span class="text-[11px] text-muted-foreground">Spatie Laravel Permission</span>
+                            </div>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 font-mono">
+                                <span class="size-1.5 rounded-full bg-emerald-500"></span> Aktif
+                            </span>
                         </div>
-                        <div class="flex items-center justify-between rounded-md bg-muted/40 p-2.5">
-                            <span class="text-muted-foreground">Auto-Scan Permission</span>
-                            <Badge variant="default" class="bg-emerald-600 text-white">Aktif</Badge>
+
+                        <div class="flex items-center justify-between rounded-lg bg-muted/40 p-2.5 border border-border/50">
+                            <div class="flex flex-col">
+                                <span class="font-medium text-foreground">Audit Columns</span>
+                                <span class="text-[11px] text-muted-foreground">created/updated/deleted_by</span>
+                            </div>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 font-mono">
+                                <span class="size-1.5 rounded-full bg-emerald-500"></span> Aktif
+                            </span>
                         </div>
-                        <div class="flex items-center justify-between rounded-md bg-muted/40 p-2.5">
-                            <span class="text-muted-foreground">Dynamic Menu Filtering</span>
-                            <Badge variant="default" class="bg-emerald-600 text-white">Aktif</Badge>
+
+                        <div class="flex items-center justify-between rounded-lg bg-muted/40 p-2.5 border border-border/50">
+                            <div class="flex flex-col">
+                                <span class="font-medium text-foreground">Security Headers</span>
+                                <span class="text-[11px] text-muted-foreground">XSS, CSRF, Clickjacking</span>
+                            </div>
+                            <span class="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-400 font-mono">
+                                <span class="size-1.5 rounded-full bg-emerald-500"></span> Aktif
+                            </span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Quick Action Shortcuts -->
+                <div class="rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+                    <h2 class="text-sm font-semibold text-foreground mb-3">Pintasan Navigasi</h2>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <Button as-child variant="outline" class="h-9 justify-start text-xs border-border/60">
+                            <Link href="/menus">
+                                <MenuIcon class="mr-1.5 size-3.5 text-emerald-700 dark:text-emerald-400" />
+                                Kelola Menu
+                            </Link>
+                        </Button>
+                        <Button as-child variant="outline" class="h-9 justify-start text-xs border-border/60">
+                            <Link href="/roles">
+                                <Shield class="mr-1.5 size-3.5 text-emerald-700 dark:text-emerald-400" />
+                                Tambah Role
+                            </Link>
+                        </Button>
+                        <Button as-child variant="outline" class="h-9 justify-start text-xs border-border/60">
+                            <Link href="/permissions">
+                                <KeyRound class="mr-1.5 size-3.5 text-emerald-700 dark:text-emerald-400" />
+                                Permissions
+                            </Link>
+                        </Button>
+                        <Button as-child variant="outline" class="h-9 justify-start text-xs border-border/60">
+                            <Link href="/activities">
+                                <History class="mr-1.5 size-3.5 text-emerald-700 dark:text-emerald-400" />
+                                Log Aktivitas
+                            </Link>
+                        </Button>
                     </div>
                 </div>
             </div>

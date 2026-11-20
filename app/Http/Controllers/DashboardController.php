@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Activity;
 use App\Models\Menu;
 use App\Models\Permission;
 use App\Models\Role;
@@ -27,6 +28,7 @@ class DashboardController extends Controller
             'stats' => $stats,
             'recentUsers' => User::recentForDashboard(),
             'rolesSummary' => Role::dashboardSummary(),
+            'recentActivities' => Activity::recentForDashboard(),
         ]);
     }
 }

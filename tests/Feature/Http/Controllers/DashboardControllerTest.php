@@ -22,6 +22,7 @@ it('renders dashboard statistics and summaries from models', function () {
             ->where('stats.total_permissions', 1)
             ->where('stats.total_menus', 1)
             ->has('recentUsers', 1)
-            ->has('rolesSummary', 1),
+            ->has('rolesSummary', 1)
+            ->has('recentActivities'),
         );
 });
